@@ -1,19 +1,20 @@
 
 import {
-    Avatar,
+ 
     Box,
     InputAdornment,
     Paper,
     TextField,
-    Typography,
+
 } from "@mui/material";
 
-import { deepOrange } from "@mui/material/colors";
 
-import { CiSettings } from "react-icons/ci";
+
+
 import { IoSearch } from "react-icons/io5";
-import { MdOutlineFavoriteBorder } from "react-icons/md";
+
 import MobileDrawer from "../drawer/MobileDrawer";
+import { Profile } from "../../features/Profile/profile";
 
 
 
@@ -65,7 +66,7 @@ export function Header() {
                     <Paper
                         elevation={5}
                         sx={{
-                            width: { xs: "100%", sm: "100%", lg: "30%" },
+                            width: { xs: "100%", sm: "100%", lg: "40%" },
                             maxWidth: { xs: "100%", lg: "400px" },
                             borderRadius: "100px",
                             flex: { xs: 1, lg: "initial" },
@@ -74,7 +75,7 @@ export function Header() {
                         <TextField
                             fullWidth
                             id="filled-search"
-                            label="Search for a song"
+                            label="Search..."
                             type="search"
                             size="small"
                             slotProps={{
@@ -91,7 +92,7 @@ export function Header() {
                             }}
                             sx={{
                                 borderRadius: "50%",
-
+                                
                                 "& .MuiOutlinedInput-root": {
                                     borderRadius: "100px",
 
@@ -139,65 +140,10 @@ export function Header() {
                             gap: 1,
                         }}
                     >
-                        <Avatar
-                            sx={{
-                                bgcolor: deepOrange[500],
-                                width: 46,
-                                height: 46,
-                            }}
-                        >
-                            A
-                        </Avatar>
-
-                        <Box
-                            sx={{
-                                display: {
-                                    xs: "none",
-                                    sm: "flex",
-                                },
-                                flexDirection: "column",
-                                gap: 0.3,
-                            }}
-                        >
-                            <Typography variant="subtitle2">
-                                Alireza Badrloo
-                            </Typography>
-
-                            <Box>
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        backgroundColor: "#12544F",
-                                        py: 0.3,
-                                        px: 1,
-                                        borderRadius: "100px",
-                                    }}
-                                >
-                                    premium
-                                </Typography>
-                            </Box>
-                        </Box>
+                     <Profile />
                     </Box>
 
-                    {/* Settings */}
-                    <Avatar
-                        sx={{
-                            bgcolor: "#22242A",
-                            cursor: "pointer",
-                        }}
-                    >
-                        <CiSettings color="#fff" />
-                    </Avatar>
-
-                    {/* Favorite */}
-                    <Avatar
-                        sx={{
-                            bgcolor: "#22242A",
-                            cursor: "pointer",
-                        }}
-                    >
-                        <MdOutlineFavoriteBorder color="#fff" />
-                    </Avatar>
+                  
 
                 </Box>
 

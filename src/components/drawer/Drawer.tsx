@@ -1,23 +1,25 @@
 
-import {  Collapse, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Paper, Typography } from "@mui/material";
+import { Collapse, Divider, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Paper, Typography } from "@mui/material";
 import { useState } from "react";
 
-import { LuLogOut } from "react-icons/lu";
+
 import { MdExpandLess, MdExpandMore, MdStarBorder } from "react-icons/md";
 import { PiPlaylistLight } from "react-icons/pi";
 import { RiHomeLine } from "react-icons/ri";
 import { RxPerson } from "react-icons/rx";
 
 import { TbCategory } from "react-icons/tb";
+import { NavLink, useNavigate } from "react-router-dom";
 
 export function Drawer() {
     const [open, setOpen] = useState(true);
+    const navigate = useNavigate()
     return (
-        <Paper elevation={5}  sx={{
+        <Paper elevation={5} sx={{
             width: '100%',
             height: '100%',
-           
-            borderRadius: '12px',
+
+            borderRadius: '0px',
         }}>
             <List sx={{
                 height: '100%',
@@ -25,27 +27,33 @@ export function Drawer() {
                 flexDirection: 'column',
                 py: 2
             }}>
-                
 
-                    <Typography sx={{
-                        textAlign: 'center',
-                        fontWeight: '800',
-                        color: '#f56a00',
-                        mb: 4
-                    }}>
-                        Pulse
-                    </Typography>
-                
+
+                <Typography sx={{
+                    textAlign: 'center',
+                    fontWeight: '800',
+                    color: '#f56a00',
+                    mb: 4
+                }}>
+                    Pulse
+                </Typography>
+
                 <ListItem disablePadding>
 
                     <ListItemButton
+                        component={NavLink}
+                        to="/"
                         sx={{
                             color: 'text.primary',
                             mx: 1,
                             my: 0.5,
                             borderRadius: '9px',
+                            "&.active": {
+                                backgroundColor: "action.selected",
 
+                            },
                         }}
+                        onClick={() => navigate('/')}
 
                     >
                         <ListItemIcon >
@@ -59,13 +67,19 @@ export function Drawer() {
                 <ListItem disablePadding>
 
                     <ListItemButton
+                        component={NavLink}
+                        to="/categories"
                         sx={{
                             color: 'text.primary',
                             mx: 1,
                             my: 0.5,
                             borderRadius: '9px',
+                            "&.active": {
+                                backgroundColor: "action.selected",
 
+                            },
                         }}
+                        onClick={() => navigate('/categories')}
 
                     >
                         <ListItemIcon sx={{
@@ -82,13 +96,19 @@ export function Drawer() {
                 <ListItem disablePadding>
 
                     <ListItemButton
+                        component={NavLink}
+                        to="/artists"
                         sx={{
                             color: 'text.primary',
                             mx: 1,
                             my: 0.5,
                             borderRadius: '9px',
+                            "&.active": {
+                                backgroundColor: "action.selected",
 
+                            },
                         }}
+                        onClick={() => navigate('/artists')}
 
                     >
                         <ListItemIcon sx={{
@@ -102,6 +122,7 @@ export function Drawer() {
                     </ListItemButton>
 
                 </ListItem>
+                <Divider />
                 <ListItem disablePadding>
                     <ListItemButton sx={{
                         color: 'text.primary',
@@ -111,7 +132,7 @@ export function Drawer() {
 
                     }} onClick={() => setOpen(!open)}>
                         <ListItemIcon>
-                            <PiPlaylistLight size={20}  /> 
+                            <PiPlaylistLight size={20} />
                         </ListItemIcon>
                         <ListItemText primary="Play List" />
                         {open ? <MdExpandLess /> : <MdExpandMore />}
@@ -129,30 +150,7 @@ export function Drawer() {
                     </List>
                 </Collapse>
 
-                <ListItem disablePadding sx={{  mt: 'auto'}}>
-
-                    <ListItemButton 
-                        sx={{
-                            color: 'text.primary',
-                            mx: 1,
-                            my: 0.5,
-                            borderRadius: '9px',
-                          
-
-                        }}
-
-                    >
-                        <ListItemIcon sx={{
-                            color: 'inherit',
-                            minWidth: 35,
-                        }}>
-                            <LuLogOut size={20} />
-                        </ListItemIcon>
-
-                        <ListItemText primary="Log Out" />
-                    </ListItemButton>
-
-                </ListItem>
+                
             </List>
 
         </Paper>

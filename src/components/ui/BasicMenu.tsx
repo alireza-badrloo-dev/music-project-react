@@ -2,12 +2,14 @@ import * as React from 'react';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import { MdMoreHoriz, MdOutlineFavorite } from 'react-icons/md';
+import {  MdOutlineFavorite } from 'react-icons/md';
+
 import { Box, Typography } from '@mui/material';
 import { PiPlayFill } from 'react-icons/pi';
 
-import { CgPlayListAdd } from 'react-icons/cg';
+import {CgPlayListAdd } from 'react-icons/cg';
 import {BiSolidMusic } from 'react-icons/bi';
+import { FiMoreVertical } from 'react-icons/fi';
 
 
 export default function BasicMenu() {
@@ -26,28 +28,35 @@ export default function BasicMenu() {
   return (
     <div>
       <Button
-        id={buttonId}
-        aria-controls={open ? menuId : undefined}
-        aria-haspopup="true"
-        aria-expanded={open}
-        onClick={handleClick}
-        sx={{
-         
-          "&:hover": {
-            backgroundColor: '#f6f6f600'
-          },
-        }}
+          id={buttonId}
+    aria-controls={open ? menuId : undefined}
+    aria-haspopup="true"
+    aria-expanded={open}
+    onClick={handleClick}
+    disableRipple
+    sx={{
+        minWidth: 0,
+        width: "auto",
+        height: "auto",
+        p: 0,
+        m: 0,
+        border: 0,
+        lineHeight: 1,
+
+        "&:hover": {
+            backgroundColor: "transparent",
+        },
+    }}
       >
         <Box sx={{
           
-          color: '#f7a456',
+          color: '#ffffff',
           "&:hover": {
-            color: '#fa7b05'
+            color: '#c9c9c9'
           },
         }}>
-          <MdMoreHoriz size={28} />
+          <FiMoreVertical size={20} />
         </Box>
-
 
       </Button>
       <Menu

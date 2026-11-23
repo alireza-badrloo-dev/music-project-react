@@ -1,16 +1,47 @@
 
-import { Box, Card, CardMedia, Grid, IconButton, Typography } from "@mui/material";
+import {
+    Box,
+    Card,
+    CardMedia,
+    Grid,
+    IconButton,
+    Typography,
+} from "@mui/material";
+
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
-import { MdChevronLeft, MdChevronRight } from "react-icons/md";
+
+import {
+    MdChevronLeft,
+    MdChevronRight,
+} from "react-icons/md";
+
+import { BiPlay } from "react-icons/bi";
 
 import { useTracks } from "../../hooks/useTracks";
+import { useNavigate } from "react-router-dom";
+
+
 
 import "swiper/css";
-import BasicMenu from "../ui/BasicMenu";
+import { useAppDispatch } from "../../store/Hooks";
+import { setCurrentTrack, setIsPlaying } from "../../features/player/PlayerSlice";
 
 export function Tracks() {
-    const { data: tracks } = useTracks();
+    const { data: tracks, isLoading, isError } = useTracks();
+
+    const navigate = useNavigate();
+    const dispatch = useAppDispatch();
+
+    // پخش آهنگ در همین صفحه
+    const handlePlayTrack = (trackId: number) => {
+        dispatch(setCurrentTrack(trackId));
+        dispatch(setIsPlaying(true));
+    };
+
+    if (isLoading) return <p>Loading...</p>;
+
+    if (isError) return <p>Error loading tracks!</p>;
 
     return (
         <Grid size={12} sx={{ width: "100%" }}>
@@ -22,7 +53,6 @@ export function Tracks() {
                     alignItems: "center",
                     justifyContent: "space-between",
                     mb: 2,
-                    
                 }}
             >
                 <Typography variant="h5">
@@ -66,22 +96,20 @@ export function Tracks() {
                 breakpoints={{
                     0: {
                         spaceBetween: 12,
-                        slidesPerView: 2
+                        slidesPerView: 2,
                     },
                     600: {
                         spaceBetween: 14,
-                        slidesPerView: 3
-
+                        slidesPerView: 3,
                     },
                     900: {
                         spaceBetween: 16,
-                        slidesPerView: 4
+                        slidesPerView: 4,
                     },
                     1200: {
                         spaceBetween: 18,
-                        slidesPerView: 6
+                        slidesPerView: 6,
                     },
-                    
                 }}
                 style={{
                     width: "100%",
@@ -93,68 +121,93 @@ export function Tracks() {
                         key={track.id}
                         style={{
                             width: "130px",
-                            padding: "5px 0px"
+                            padding: "5px 0",
                         }}
-
                     >
                         <Card
+                            onClick={() => navigate(`/track/${track.id}`)}
                             sx={{
                                 display: "flex",
-                                flexDirection: 'column',
+                                flexDirection: "column",
                                 alignItems: "center",
                                 gap: 2,
                                 p: 1.5,
                                 borderRadius: 1,
                                 boxShadow: 1,
-                                cursor: 'pointer',
-                                border: 'solid 1px #ffffff00',
-                             
-
+                                cursor: "pointer",
+                                border: "1px solid #ffffff00",
                                 transition: "all 0.3s ease",
+
                                 "&:hover": {
                                     transform: "translateY(-3px)",
                                     boxShadow: 3,
-                                    border: 'solid 1px orange'
+                                    border: "1px solid orange",
+                                },
+
+                                "&:hover .play-button": {
+                                    opacity: 1,
+                                    transform: "translateY(0)",
                                 },
                             }}
                         >
-                            <Box sx={{
-                               
-                                
-                                justifyContent: 'start',
-                                position:'absolute',
-                                left: 2
-                            }}>
-                                <BasicMenu />
-                            </Box>
-                            <CardMedia
-                                component="img"
-                                image={
-                                   track.cover_url
-                                    
-                                }
-                                alt={track.title}
+                            {/* Cover */}
+                            <Box
                                 sx={{
-                                    width: '100%',
-                                    height: '150px',
+                                    width: "100%",
+                                    position: "relative",
+                                    overflow: "hidden",
                                     borderRadius: 1,
-                                    objectFit: "cover",
                                 }}
-                            />
+                            >
+                                <CardMedia
+                                    component="img"
+                                    image={track.cover_url}
+                                    alt={track.title}
+                                    sx={{
+                                        width: "100%",
+                                        height: "150px",
+                                        objectFit: "cover",
+                                    }}
+                                />
 
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <Typography
-                                    variant="subtitle1"
-                                    noWrap
+                                {/* Play Button */}
+                                <IconButton
+                                    className="play-button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        handlePlayTrack(track.id);
+                                    }}
+                                    sx={{
+                                        position: "absolute",
+                                        bottom: 8,
+                                        left: 8,
+                                        bgcolor: "#f99346",
+                                        color: "white",
+                                        opacity: 0,
+                                        transform: "translateY(8px)",
+                                        transition: "all 0.3s ease",
+
+                                        "&:hover": {
+                                            bgcolor: "#fc852b",
+                                        },
+                                    }}
                                 >
+                                    <BiPlay size={21} />
+                                </IconButton>
+                            </Box>
+
+                            {/* Track Info */}
+                            <Box sx={{ minWidth: 0, width: "100%" }}>
+                                <Typography variant="subtitle1" noWrap>
                                     {track.title}
                                 </Typography>
 
                                 <Typography
                                     variant="caption"
                                     color="text.secondary"
+                                    noWrap
                                 >
-                                    {track.play_count.toLocaleString()} Plays
+                                    {track.artists?.name}
                                 </Typography>
                             </Box>
                         </Card>

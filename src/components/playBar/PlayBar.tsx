@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
     Box,
@@ -24,7 +24,13 @@ import {
 import { useTracks } from "../../hooks/useTracks";
 import { supabase } from "../../services/supabase";
 
-// Format time
+import { useAppDispatch, useAppSelector } from "../../store/Hooks";
+import {
+    setIsPlaying,
+    setCurrentTrack,
+} from "../../features/player/PlayerSlice";
+
+// تبدیل ثانیه به دقیقه و ثانیه
 const formatTime = (seconds: number) => {
     if (!Number.isFinite(seconds)) return "0:00";
 
@@ -42,30 +48,45 @@ export function PlayBar() {
         error,
     } = useTracks();
 
+    const dispatch = useAppDispatch();
+
+    // اطلاعات پلیر از Redux
+    const currentTrackId = useAppSelector(
+        (state) => state.player.currentTrackId
+    );
+
+    const isPlaying = useAppSelector(
+        (state) => state.player.isPlaying
+    );
+
     const audioRef = useRef<HTMLAudioElement>(null);
 
-    // Tracks received from Supabase
+    // آهنگ‌های دریافت‌شده
     const availableTracks = tracks ?? [];
 
-    // States
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const currentIndex = availableTracks.findIndex(
+        (track) => track.id === currentTrackId
+    );
+
+    const currentTrack = availableTracks.find(
+        (track) => track.id === currentTrackId
+    );
+
+    // Stateهای مربوط به رابط کاربری
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(70);
+
     const [isLiked, setIsLiked] = useState(false);
     const [isShuffle, setIsShuffle] = useState(false);
     const [isRepeat, setIsRepeat] = useState(false);
 
-    // Audio URL
     const [audioUrl, setAudioUrl] = useState("");
     const [isAudioLoading, setIsAudioLoading] = useState(false);
+    const [audioError, setAudioError] = useState("");
 
-    const currentTrack = availableTracks[currentIndex];
-
-    // Get playable URL
-    const getAudioUrl = async (path: string) => {
-        // If audio_url is already a complete URL
+    // دریافت آدرس فایل صوتی
+    const getAudioUrl = useCallback(async (path: string) => {
         if (path.startsWith("http://") || path.startsWith("https://")) {
             return path;
         }
@@ -79,35 +100,41 @@ export function PlayBar() {
         }
 
         return data.signedUrl;
-    };
+    }, []);
 
-    // Load audio when track changes
+    // بارگذاری آهنگ انتخاب‌شده
     useEffect(() => {
+        if (!currentTrack) return;
+
         let cancelled = false;
 
         const loadAudio = async () => {
             setAudioUrl("");
             setCurrentTime(0);
             setDuration(0);
-            setIsPlaying(false);
+            setAudioError("");
+            setIsLiked(false);
+            setIsAudioLoading(true);
 
+            // توقف آهنگ قبلی
             audioRef.current?.pause();
 
-            if (!currentTrack?.audio_url) {
-                setIsAudioLoading(false);
-                return;
-            }
-
             try {
-                setIsAudioLoading(true);
-
                 const url = await getAudioUrl(currentTrack.audio_url);
 
                 if (!cancelled) {
                     setAudioUrl(url);
                 }
             } catch (error) {
-                console.error("Audio URL error:", error);
+                if (!cancelled) {
+                    const message =
+                        error instanceof Error
+                            ? error.message
+                            : "خطا در دریافت فایل صوتی";
+
+                    setAudioError(message);
+                    console.error("Audio URL error:", error);
+                }
             } finally {
                 if (!cancelled) {
                     setIsAudioLoading(false);
@@ -120,9 +147,40 @@ export function PlayBar() {
         return () => {
             cancelled = true;
         };
-    }, [currentTrack?.id, currentTrack?.audio_url]);
+    }, [currentTrack?.id, currentTrack?.audio_url, getAudioUrl]);
 
-    // Volume
+    // هماهنگ کردن وضعیت Redux با تگ Audio
+    // اگر آهنگ انتخاب شده و isPlaying برابر true باشد، خودکار پخش می‌شود.
+    useEffect(() => {
+        const audio = audioRef.current;
+
+        if (!audio || !audioUrl) return;
+
+        let cancelled = false;
+
+        if (isPlaying) {
+            const playAudio = async () => {
+                try {
+                    await audio.play();
+                } catch (error) {
+                    if (!cancelled) {
+                        console.error("Playback error:", error);
+                        dispatch(setIsPlaying(false));
+                    }
+                }
+            };
+
+            playAudio();
+        } else {
+            audio.pause();
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [audioUrl, isPlaying, dispatch]);
+
+    // تنظیم صدا
     useEffect(() => {
         if (audioRef.current) {
             audioRef.current.volume = volume / 100;
@@ -130,29 +188,28 @@ export function PlayBar() {
     }, [volume]);
 
     // Play / Pause
-    const handlePlay = async () => {
-        if (!audioRef.current || !audioUrl) return;
+    const handlePlay = () => {
+        if (!audioUrl || isAudioLoading) return;
 
-        if (isPlaying) {
-            audioRef.current.pause();
-            setIsPlaying(false);
-        } else {
-            try {
-                await audioRef.current.play();
-                setIsPlaying(true);
-            } catch (error) {
-                console.error("Playback error:", error);
-            }
-        }
+        dispatch(setIsPlaying(!isPlaying));
     };
 
-    // Next Track
+    // آهنگ بعدی
     const handleNext = () => {
-        if (!availableTracks.length) return;
+        if (!availableTracks.length || currentIndex < 0) return;
+
+        // اگر فقط یک آهنگ وجود دارد
+        if (availableTracks.length === 1) {
+            if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                dispatch(setIsPlaying(true));
+            }
+            return;
+        }
 
         let nextIndex: number;
 
-        if (isShuffle && availableTracks.length > 1) {
+        if (isShuffle) {
             do {
                 nextIndex = Math.floor(
                     Math.random() * availableTracks.length
@@ -162,12 +219,12 @@ export function PlayBar() {
             nextIndex = (currentIndex + 1) % availableTracks.length;
         }
 
-        setCurrentIndex(nextIndex);
+        dispatch(setCurrentTrack(availableTracks[nextIndex].id));
     };
 
-    // Previous Track
+    // آهنگ قبلی
     const handlePrevious = () => {
-        if (!availableTracks.length) return;
+        if (!availableTracks.length || currentIndex < 0) return;
 
         if (audioRef.current && audioRef.current.currentTime > 3) {
             audioRef.current.currentTime = 0;
@@ -175,13 +232,14 @@ export function PlayBar() {
             return;
         }
 
-        setCurrentIndex(
+        const previousIndex =
             (currentIndex - 1 + availableTracks.length) %
-                availableTracks.length
-        );
+            availableTracks.length;
+
+        dispatch(setCurrentTrack(availableTracks[previousIndex].id));
     };
 
-    // Seek
+    // جابه‌جایی در تایم‌لاین
     const handleSeek = (
         _: Event,
         value: number | number[]
@@ -195,7 +253,7 @@ export function PlayBar() {
         setCurrentTime(newValue);
     };
 
-    // Track Ended
+    // پایان آهنگ
     const handleEnded = async () => {
         if (isRepeat && audioRef.current) {
             audioRef.current.currentTime = 0;
@@ -204,13 +262,18 @@ export function PlayBar() {
                 await audioRef.current.play();
             } catch (error) {
                 console.error("Playback error:", error);
+                dispatch(setIsPlaying(false));
             }
         } else {
             handleNext();
         }
     };
 
-    // Loading
+    // قبل از انتخاب آهنگ، PlayBar نمایش داده نمی‌شود
+    if (currentTrackId === null) {
+        return null;
+    }
+
     if (isLoading) {
         return (
             <Paper
@@ -233,7 +296,6 @@ export function PlayBar() {
         );
     }
 
-    // Error
     if (isError) {
         console.error("Tracks error:", error);
 
@@ -258,6 +320,8 @@ export function PlayBar() {
         );
     }
 
+    if (!currentTrack) return null;
+
     return (
         <Paper
             elevation={4}
@@ -266,45 +330,28 @@ export function PlayBar() {
                 bottom: 0,
                 left: 0,
                 width: "100%",
-                height: {
-                    xs: 105,
-                    sm: 100,
-                    md: 60,
-                },
+                height: { xs: 105, sm: 100, md: 60 },
                 zIndex: 1000,
                 display: "flex",
                 flexDirection: "row",
-                flexWrap: {
-                    xs: "wrap",
-                    md: "nowrap",
-                },
+                flexWrap: { xs: "wrap", md: "nowrap" },
                 alignItems: "center",
                 alignContent: "center",
                 justifyContent: "space-between",
-                px: {
-                    xs: 1,
-                    sm: 2,
-                    md: 3,
-                },
-                py: {
-                    xs: 1,
-                    sm: 1,
-                    md: 0,
-                },
-                gap: {
-                    xs: 0.5,
-                    md: 3,
-                },
+                px: { xs: 1, sm: 2, md: 3 },
+                py: { xs: 1, sm: 1, md: 0 },
+                gap: { xs: 0.5, md: 3 },
                 color: "#fff",
                 borderRadius: 0,
                 borderTop: "1px solid rgba(255,255,255,0.08)",
                 boxSizing: "border-box",
             }}
         >
-            {/* Audio Element */}
+            {/* Audio */}
             <audio
                 ref={audioRef}
                 src={audioUrl || undefined}
+                preload="metadata"
                 onTimeUpdate={() => {
                     if (audioRef.current) {
                         setCurrentTime(audioRef.current.currentTime);
@@ -315,118 +362,89 @@ export function PlayBar() {
                         setDuration(audioRef.current.duration);
                     }
                 }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
+                onPlay={() => dispatch(setIsPlaying(true))}
                 onEnded={handleEnded}
                 onError={() => {
-                    console.error("Audio file could not be loaded.");
+                    if (audioUrl) {
+                        setAudioError("خطا در بارگذاری فایل صوتی");
+                        console.error("Audio file could not be loaded.");
+                    }
                 }}
             />
 
             {/* Left: Current Track */}
             <Box
                 sx={{
-                    width: {
-                        xs: "45%",
-                        md: "25%",
-                    },
+                    width: { xs: "45%", md: "25%" },
                     minWidth: 0,
                     display: "flex",
                     alignItems: "center",
-                    gap: {
-                        xs: 0.8,
-                        md: 1.5,
-                    },
-                    order: {
-                        xs: 1,
-                        md: 1,
-                    },
+                    gap: { xs: 0.8, md: 1.5 },
+                    order: { xs: 1, md: 1 },
                 }}
             >
-                {/* Track Image */}
                 <Box
                     component="img"
-                    src={currentTrack?.cover_url || ""}
-                    alt={currentTrack?.title || "Track cover"}
+                    src={currentTrack.cover_url || ""}
+                    alt={currentTrack.title || "Track cover"}
                     sx={{
-                        width: {
-                            xs: 34,
-                            sm: 38,
-                            md: 42,
-                        },
-                        height: {
-                            xs: 34,
-                            sm: 38,
-                            md: 42,
-                        },
+                        width: { xs: 34, sm: 38, md: 42 },
+                        height: { xs: 34, sm: 38, md: 42 },
                         borderRadius: 2,
                         objectFit: "cover",
                         flexShrink: 0,
                     }}
                 />
 
-                {/* Track Info */}
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography
                         sx={{
-                            fontSize: {
-                                xs: 10,
-                                sm: 12,
-                                md: 15,
-                            },
+                            fontSize: { xs: 10, sm: 12, md: 15 },
                             fontWeight: 600,
                         }}
                         noWrap
                     >
-                        {currentTrack?.title || "No Track"}
+                        {currentTrack.title}
                     </Typography>
 
                     <Typography
                         sx={{
-                            fontSize: {
-                                xs: 9,
-                                sm: 11,
-                                md: 13,
-                            },
+                            fontSize: { xs: 9, sm: 11, md: 13 },
                             color: "#A4A5B2",
                         }}
                         noWrap
                     >
-                        Unknown Artist
+                        {currentTrack.artists?.name ?? "Unknown Artist"}
                     </Typography>
+
+                    {audioError && (
+                        <Typography
+                            sx={{ fontSize: 10, color: "#ff7777" }}
+                            noWrap
+                        >
+                            {audioError}
+                        </Typography>
+                    )}
                 </Box>
             </Box>
 
             {/* Right: Extra Controls */}
             <Box
                 sx={{
-                    width: {
-                        xs: "50%",
-                        md: "20%",
-                    },
+                    width: { xs: "50%", md: "20%" },
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "flex-end",
-                    gap: {
-                        xs: 0,
-                        md: 1,
-                    },
+                    gap: { xs: 0, md: 1 },
                     flexShrink: 0,
-                    order: {
-                        xs: 2,
-                        md: 3,
-                    },
+                    order: { xs: 2, md: 3 },
                 }}
             >
-                {/* Like */}
                 <IconButton
-                    onClick={() => setIsLiked(!isLiked)}
+                    onClick={() => setIsLiked((prev) => !prev)}
                     sx={{
                         color: isLiked ? "#F25912" : "#E5E5EB",
-                        p: {
-                            xs: 0.5,
-                            md: 1,
-                        },
+                        p: { xs: 0.5, md: 1 },
                     }}
                 >
                     {isLiked ? (
@@ -436,41 +454,29 @@ export function PlayBar() {
                     )}
                 </IconButton>
 
-                {/* Shuffle */}
                 <IconButton
-                    onClick={() => setIsShuffle(!isShuffle)}
+                    onClick={() => setIsShuffle((prev) => !prev)}
                     sx={{
                         color: isShuffle ? "#F25912" : "#E5E5EB",
-                        p: {
-                            xs: 0.5,
-                            md: 1,
-                        },
+                        p: { xs: 0.5, md: 1 },
                     }}
                 >
                     <IoShuffle size={21} />
                 </IconButton>
 
-                {/* Repeat */}
                 <IconButton
-                    onClick={() => setIsRepeat(!isRepeat)}
+                    onClick={() => setIsRepeat((prev) => !prev)}
                     sx={{
                         color: isRepeat ? "#F25912" : "#E5E5EB",
-                        p: {
-                            xs: 0.5,
-                            md: 1,
-                        },
+                        p: { xs: 0.5, md: 1 },
                     }}
                 >
                     <IoRepeat size={21} />
                 </IconButton>
 
-                {/* Volume */}
                 <Box
                     sx={{
-                        display: {
-                            xs: "none",
-                            md: "flex",
-                        },
+                        display: { xs: "none", md: "flex" },
                         alignItems: "center",
                         gap: 1,
                         width: 110,
@@ -506,63 +512,39 @@ export function PlayBar() {
             {/* Center: Playback Controls and Progress */}
             <Box
                 sx={{
-                    flex: {
-                        xs: "1 1 100%",
-                        md: 1,
-                    },
+                    flex: { xs: "1 1 100%", md: 1 },
                     minWidth: 0,
                     display: "flex",
                     alignItems: "center",
-                    gap: {
-                        xs: 1,
-                        md: 3,
-                    },
-                    order: {
-                        xs: 3,
-                        md: 2,
-                    },
+                    gap: { xs: 1, md: 3 },
+                    order: { xs: 3, md: 2 },
                 }}
             >
-                {/* Playback Buttons */}
                 <Box
                     sx={{
                         display: "flex",
                         alignItems: "center",
-                        gap: {
-                            xs: 0,
-                            md: 1,
-                        },
+                        gap: { xs: 0, md: 1 },
                         flexShrink: 0,
                     }}
                 >
-                    {/* Previous */}
                     <IconButton
                         onClick={handlePrevious}
                         disabled={!availableTracks.length}
                         sx={{
                             color: "#E5E5EB",
-                            p: {
-                                xs: 0.5,
-                                md: 1,
-                            },
+                            p: { xs: 0.5, md: 1 },
                         }}
                     >
                         <IoPlaySkipBack size={21} />
                     </IconButton>
 
-                    {/* Play / Pause */}
                     <IconButton
                         onClick={handlePlay}
                         disabled={!audioUrl || isAudioLoading}
                         sx={{
-                            width: {
-                                xs: 34,
-                                md: 42,
-                            },
-                            height: {
-                                xs: 34,
-                                md: 42,
-                            },
+                            width: { xs: 34, md: 42 },
+                            height: { xs: 34, md: 42 },
                             bgcolor: "#51525F",
                             color: "#fff",
                             border: "1px solid rgba(255,255,255,0.12)",
@@ -584,16 +566,12 @@ export function PlayBar() {
                         )}
                     </IconButton>
 
-                    {/* Next */}
                     <IconButton
                         onClick={handleNext}
                         disabled={!availableTracks.length}
                         sx={{
                             color: "#E5E5EB",
-                            p: {
-                                xs: 0.5,
-                                md: 1,
-                            },
+                            p: { xs: 0.5, md: 1 },
                         }}
                     >
                         <IoPlaySkipForward size={21} />
@@ -607,28 +585,20 @@ export function PlayBar() {
                         minWidth: 0,
                         display: "flex",
                         alignItems: "center",
-                        gap: {
-                            xs: 0.5,
-                            md: 1,
-                        },
+                        gap: { xs: 0.5, md: 1 },
                     }}
                 >
-                    {/* Current Time */}
                     <Typography
                         sx={{
                             fontSize: 10,
                             color: "#A4A5B2",
                             minWidth: 30,
-                            display: {
-                                xs: "none",
-                                sm: "block",
-                            },
+                            display: { xs: "none", sm: "block" },
                         }}
                     >
                         {formatTime(currentTime)}
                     </Typography>
 
-                    {/* Progress Slider */}
                     <Slider
                         size="small"
                         min={0}
@@ -657,17 +627,13 @@ export function PlayBar() {
                         }}
                     />
 
-                    {/* Duration */}
                     <Typography
                         sx={{
                             fontSize: 10,
                             color: "#A4A5B2",
                             minWidth: 30,
                             textAlign: "right",
-                            display: {
-                                xs: "none",
-                                sm: "block",
-                            },
+                            display: { xs: "none", sm: "block" },
                         }}
                     >
                         {formatTime(duration)}
